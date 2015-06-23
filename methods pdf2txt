@@ -1,0 +1,115 @@
+# Here are a few methods for getting text from PDF files. Do read through 
+# the instructions carefully! NOte that this code is written for Windows 7,
+# slight adjustments may be needed for other OSs
+
+# Tell R what folder contains your 1000s of PDFs
+dest <- "G:/somehere/with/many/PDFs"
+
+"cijfers 1" <- "Cijfers.11.12.T1B.eerste.kans_NEU5V.txt"
+list(`cijfers 1`)
+table(`cijfers 1`)
+
+combined <- bind()
+
+dest <- "C:/Users/marc/SURFdrive/Personal Files HU/DATA SCIENCE COURSE TRACK/TEST DATA SETS/Corpus_PDF"
+
+
+myfiles <- list.files(path = dest, pattern = "pdf",  full.names = TRUE)
+
+
+############### PDF (text format) to TXT ###################
+
+##### Wait! #####
+# Before proceeding, make sure you have a copy of pdf2text
+# on your computer! Details: https://en.wikipedia.org/wiki/Pdftotext
+# Download: http://www.foolabs.com/xpdf/download.html
+
+# If you have a PDF with text, ie you can open the PDF in a 
+# PDF viewer and select text with your curser, then use these 
+# lines to convert each PDF file that is named in the vector 
+# into text file is created in the same directory as the PDFs
+# note that my pdftotext.exe is in a different location to yours
+lapply(myfiles, function(i) system(paste('"C:/Program Files/xpdf/bin64/pdftotext.exe"', paste0('"', i, '"')), wait = FALSE) )
+
+# where are the txt files you just made?
+dest # in this folder
+
+# And now you're ready to do some text mining on the text files
+
+############### PDF to CSV (DfR format) ####################
+
+# or if you want DFR-style csv files...
+# read txt files into R
+mytxtfiles <- list.files(path = dest, pattern = "txt",  full.names = TRUE)
+
+library(tm)
+mycorpus <- Corpus(DirSource(dest, pattern = "txt"))
+# warnings may appear after you run the previous line, they
+# can be ignored
+mycorpus <- tm_map(mycorpus,  removeNumbers)
+mycorpus <- tm_map(mycorpus,  removePunctuation)
+mycorpus <- tm_map(mycorpus,  stripWhitespace)
+mydtm <- DocumentTermMatrix(mycorpus)
+# remove some OCR weirdness
+# words with more than 2 consecutive characters
+mydtm <- mydtm[,!grepl("(.)\\1{2,}", mydtm$dimnames$Terms)]
+
+# get each doc as a csv with words and counts
+for(i in 1:nrow(mydtm)){
+  # get word counts
+  counts <- as.vector(as.matrix(mydtm[1,]))
+  # get words
+  words <- mydtm$dimnames$Terms
+  # combine into data frame
+  df <- data.frame(word = words, count = counts,stringsAsFactors = FALSE)
+  # exclude words with count of zero
+  df <- df[df$count != 0,]
+  # write to CSV with original txt filename
+  write.csv(df, paste0(mydtm$dimnames$Docs[i],".csv"), row.names = FALSE) 
+}
+
+# and now you're ready to work with the csv files
+
+############### PDF to TXT (all text between two words) ####
+
+## Below is about splitting the text files at certain characters
+## can be skipped...
+
+# if you just want the abstracts, we can use regex to extract that part of
+# each txt file, Assumes that the abstract is always between the words 'Abstract'
+# and 'Introduction'
+
+abstracts <- lapply(mytxtfiles, function(i) {
+  j <- paste0(scan(i, what = character()), collapse = " ")
+  regmatches(j, gregexpr("(?<=abstract).*?(?=discussion)", j, perl=TRUE))
+})
+# Write abstracts into separate txt files...
+
+# write abstracts as txt files 
+# (or use them in the list for whatever you want to do next)
+lapply(1:length(abstracts),  function(i) write.table(abstracts[i], file=paste(mytxtfiles[i], "abstract", "txt", sep="."), quote = FALSE, row.names = FALSE, col.names = FALSE, eol = " " ))
+
+# And now you're ready to do some text mining on the txt 
+
+# originally on http://stackoverflow.com/a/21449040/1036500
+
+theURL <- "http://www.loc.gov/rr/print/list/057_chron.html"
+presidents <- readHTMLTable(theURL, which=3, as.data.frame=TRUE, skip.rows = 1, stringsAsFactors=FALSE)
+
+FILES <- list.files( pattern = ".txt")
+
+for (i in 1:length(FILES)) {
+  FILE=read.table(file=FILES[i],header=T)
+  write.csv(FILE,file=paste0("C:/Users/marc/SURFdrive/Personal Files HU/DATA SCIENCE COURSE TRACK/TEST DATA SETS/Corpus_PDF",sub(".txt","",FILES[i]),".csv"))
+}
+
+
+echo # convert-pdf-2-text >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git remote add origin https://github.com/Maddocent/convert-pdf-2-text.git
+git push -u origin master
+
+
+
